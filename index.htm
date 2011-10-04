@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+
+<html>
+
+  <head>
+    <title>TweetWatcher</title>
+    <link href="/static/style.css" rel="stylesheet" type="text/css"/>
+  </head>
+
+
+  <body>
+
+    <h1>#TweetWatcher</h1>
+
+    <ul id="tweets">
+    </ul>
+
+    <script type="text/javascript" src="/static/jquery.js"></script>
+    <script type="text/javascript" src="/static/client.js"></script>
+    <script type="text/javascript">
+      TWEETHOSE.hostName = "{{ host }}";
+    </script>
+  </body>
+
+</html>

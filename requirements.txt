@@ -1,0 +1,5 @@
+nose
+redis
+tornado
+-e git://github.com/joshmarshall/TweetStream.git#egg=tweetstream
+-e git://github.com/joshmarshall/toredis.git#egg=toredis

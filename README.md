@@ -31,8 +31,8 @@ directory. It should look something like this:
 
 ```python
 import tweetstream
-tweetstream.TWITTER_API_USER = "myTwitterName"
-tweetstream.TWITTER_API_PASSWORD = "myPassword"
+tweetstream.TWITTER_APP_USER = "myTwitterName"
+tweetstream.TWITTER_APP_PASSWORD = "myPassword"
 
 SETTINGS = {
     "redis_pub_channel": "myawesomechannel",

@@ -6,10 +6,10 @@ try:
     from settings import SETTINGS
 except ImportError:
     # No local settings
-    SETTINGS = {
-        "twitter_url": "/1/statuses/sample.json",
-        "redis_pub_channel": "tweetwatcher"
-    }
+    SETTINGS = {}
+
+SETTINGS.setdefault("twitter_url", "/1/statuses/sample.json")
+SETTINGS.setdefault("redis_pub_channel", "tweetwatcher")
 
 # Using blocking client because async one is underdeveloped
 PUBLISH_CLIENT = redis.Redis()

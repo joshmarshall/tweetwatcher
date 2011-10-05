@@ -18,7 +18,10 @@ SETTINGS = {
 
     # Redis arguments
     "redis_host": "localhost",
-    "redis_pub_channel": "tweetwatcher"
+    "redis_pub_channel": "tweetwatcher",
+
+    # cache settings (should use redis for this later!!)
+    "max_cache": 50
 }
 
 try:
@@ -33,6 +36,7 @@ OPTIONS.add_option("-p", "--port", dest="port", type="int",
     default=8888, help="the server port")
 
 CLIENTS = {} # in memory list of this Tornado instance's connections
+CACHE = []
 
 class PageHandler(RequestHandler):
     """ Just a simple handler for loading the base index page. """
@@ -49,10 +53,21 @@ class PollHandler(RequestHandler):
         def get(self):
             """ Long polling group """
             self.client_id = self.get_cookie(SETTINGS["client_id_cookie"])
+            last_time = int(self.get_argument(SETTINGS["last_time_argument"], 0))
             if not self.client_id:
                 self.client_id = uuid.uuid4().hex
                 self.set_cookie(SETTINGS["client_id_cookie"], self.client_id)
             CLIENTS[self.client_id] = self
+            messages = {
+                "type": "messages",
+                "messages": [],
+                "time": int(time.time())
+            }
+            for msg in CACHE[:]:
+                if msg["time"] > last_time:
+                    messages["messages"].append(msg)
+            if messages["messages"]:
+                return self.finish(messages)
 
         def write_message(self, message):
             """ Write a response and close connection """
@@ -73,6 +88,7 @@ class StreamHandler(WebSocketHandler):
         """ Creates the client and watches stream """
         self.client_id = uuid.uuid4().hex
         CLIENTS[self.client_id] = self
+        [self.write_message(msg) for msg in CACHE]
 
     def send_message(self, message):
         """ Send a message to the watching clients """
@@ -97,6 +113,9 @@ def handle_message(message):
         # Nothing important right now
         return
     message = json.loads(msg_value)
+    CACHE.append(message)
+    while len(CACHE) > 50:
+        CACHE.pop(0)
     for client in CLIENTS.values():
         try:
             client.write_message(message)

@@ -1,4 +1,5 @@
 from tornado.web import RequestHandler, Application, asynchronous
+from tornado.httpclient import AsyncHTTPClient
 from tornado.websocket import WebSocketHandler
 from tornado.ioloop import IOLoop
 from toredis.client import Client
@@ -7,6 +8,8 @@ import uuid
 import time
 import optparse
 import logging
+import urllib
+import urlparse
 
 SETTINGS = {
     "port": 8888,
@@ -124,19 +127,64 @@ def handle_message(message):
             logging.error("%s", exc)
 
 
+def cache_prefetched_tweets(response):
+    """ Fills cache with new messages """
+    if response.code != 200:
+        logging.error("Invalid twitter response: %s" % response.code)
+        return
+    results = json.loads(response.body)["results"]
+    results.reverse()
+    for result in results:
+        try:
+            text = result["text"]
+            name = ""
+            username = result["from_user"]
+            avatar = result["profile_image_url"]
+        except KeyError:
+            logging.error("Invalid tweet response %s" % result)
+            continue
+        CACHE.append({
+            "type": "tweet",
+            "text": text,
+            "name": name,
+            "username": username,
+            "avatar": avatar,
+            "time": 1
+        })
+
+
+def prefetch_tweets(ioloop):
+    """ Prefetches the tweets for the configured keyword """
+    client = AsyncHTTPClient()
+    twitter_url_parsed = urlparse.urlparse(SETTINGS["twitter_url"])
+    twitter_query = urlparse.parse_qs(twitter_url_parsed.query)
+    twitter_keywords = twitter_query.get("track")
+    if not twitter_keywords:
+        logging.warning("No twitter keywords -- not prefetching.")
+        return
+    params = {
+        "result_type": "recent",
+        "rpp": SETTINGS["max_cache"],
+        "with_twitter_user_id": "true",
+        "q": " ".join(twitter_keywords)
+    }
+    query_params = urllib.urlencode(params)
+    client.fetch("https://search.twitter.com/search.json?%s" % query_params,
+        callback=cache_prefetched_tweets)
 
 def main():
     """ Start the application and Twitter stream monitor """
     options, args = OPTIONS.parse_args()
     if options.port:
         SETTINGS["port"] = options.port
+    ioloop = IOLoop.instance()
+    prefetch_tweets(ioloop)
     app = Application([
         (r"/", PageHandler),
         (r"/stream", StreamHandler),
         (r"/poll", PollHandler)
     ], static_path="static", debug=True)
     app.listen(SETTINGS["port"])
-    ioloop = IOLoop.instance()
     client = Client() # redis connection for all connected clients
     client.connect()
     client.subscribe(SETTINGS["redis_pub_channel"], callback=handle_message)
